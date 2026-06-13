@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  python:
+    name: Python lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install shared + gateway deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e packages/shared
+          pip install -r apps/gateway/requirements.txt
+          pip install ruff
+
+      - name: Ruff (lint)
+        run: ruff check packages services apps/gateway || true
+
+      - name: Pytest
+        run: pytest -q
+        env:
+          MODEL_MOCK_MODE: "true"
+          DATABASE_URL: "sqlite+aiosqlite:///./test.db"
+
+  ui:
+    name: UI build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_GATEWAY_URL: "http://localhost:8000"
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for obvious secrets in tracked files
+        run: |
+          set -e
+          # Fail if a real .env is tracked, or common secret patterns appear in the diff.
+          if git ls-files | grep -E '(^|/)\.env$' ; then
+            echo "::error::A real .env file is tracked. Remove it." && exit 1
+          fi
+          if git grep -nE '(sk-ant-[A-Za-z0-9]|ghp_[A-Za-z0-9]{20,}|xoxb-[A-Za-z0-9-]+|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----)' -- . ':(exclude).github/workflows/ci.yml' ; then
+            echo "::error::Possible secret detected in tracked files." && exit 1
+          fi
+          echo "No obvious secrets found."

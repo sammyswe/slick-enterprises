@@ -1,0 +1,177 @@
+# Slick Enterprises HQ - Docker Compose (one container per major service).
+# Run from the repo root: `make up`  (or `docker compose -f infra/docker/docker-compose.yml up -d --build`)
+#
+# Build contexts are the repo root so Python images can include packages/shared.
+# The repo is also mounted at /workspace so services can read/write businesses/ + skills/.
+
+name: slick-hq
+
+x-python-env: &python-env
+  env_file:
+    - ../../.env
+  environment:
+    SLICK_REPO_ROOT: /workspace
+
+services:
+  slick-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB are provided via env_file.
+    env_file:
+      - ../../.env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      # Uses the env vars injected into the container (no compose-time interpolation).
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  slick-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  slick-gateway:
+    build:
+      context: ../..
+      dockerfile: apps/gateway/Dockerfile
+    restart: unless-stopped
+    <<: *python-env
+    volumes:
+      - ../..:/workspace
+    ports:
+      - "8000:8000"
+    depends_on:
+      slick-postgres:
+        condition: service_healthy
+      slick-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').getcode()==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  slick-orchestrator:
+    build:
+      context: ../..
+      dockerfile: services/orchestrator/Dockerfile
+    restart: unless-stopped
+    <<: *python-env
+    volumes:
+      - ../..:/workspace
+    working_dir: /app
+    depends_on:
+      slick-postgres:
+        condition: service_healthy
+      slick-redis:
+        condition: service_healthy
+
+  slick-cost-controller:
+    build:
+      context: ../..
+      dockerfile: services/cost-controller/Dockerfile
+    restart: unless-stopped
+    <<: *python-env
+    depends_on:
+      slick-postgres:
+        condition: service_healthy
+      slick-redis:
+        condition: service_healthy
+
+  slick-openclaw-bridge:
+    build:
+      context: ../..
+      dockerfile: services/openclaw-bridge/Dockerfile
+    restart: unless-stopped
+    <<: *python-env
+    ports:
+      - "8100:8100"
+    depends_on:
+      slick-redis:
+        condition: service_healthy
+
+  slick-hermes-bridge:
+    build:
+      context: ../..
+      dockerfile: services/hermes-bridge/Dockerfile
+    restart: unless-stopped
+    <<: *python-env
+    volumes:
+      - hermesdata:/data/hermes
+    ports:
+      - "8200:8200"
+    depends_on:
+      slick-redis:
+        condition: service_healthy
+
+  slick-sandbox-runner:
+    build:
+      context: ../..
+      dockerfile: services/sandbox-runner/Dockerfile
+    restart: unless-stopped
+    <<: *python-env
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    ports:
+      - "8300:8300"
+
+  slick-skill-sync:
+    build:
+      context: ../..
+      dockerfile: services/skill-sync/Dockerfile
+    restart: unless-stopped
+    <<: *python-env
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      slick-postgres:
+        condition: service_healthy
+      slick-redis:
+        condition: service_healthy
+
+  slick-discord-bot:
+    build:
+      context: ../..
+      dockerfile: apps/discord-bot/Dockerfile
+    restart: unless-stopped
+    <<: *python-env
+    depends_on:
+      slick-gateway:
+        condition: service_started
+      slick-redis:
+        condition: service_healthy
+
+  slick-ui:
+    build:
+      context: ../../apps/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL:-http://localhost:8000}
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      slick-gateway:
+        condition: service_started
+
+volumes:
+  pgdata:
+  redisdata:
+  hermesdata:

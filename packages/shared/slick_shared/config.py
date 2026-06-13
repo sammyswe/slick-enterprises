@@ -1,0 +1,98 @@
+"""Central configuration loader.
+
+Every service reads configuration through `get_settings()`. No module should open
+`.env` or read secret files directly (see .cursor/rules/01-no-secrets.mdc).
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Strongly-typed settings sourced from environment variables / `.env`."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    # ---- Core ----
+    env: str = "development"
+    log_level: str = "INFO"
+    tz: str = "Europe/London"
+
+    # ---- UI auth ----
+    ui_admin_password: str = "change-me-please"
+    gateway_api_token: str = "dev-gateway-token-change-me"
+
+    # ---- Gateway ----
+    gateway_host: str = "0.0.0.0"
+    gateway_port: int = 8000
+    gateway_public_url: str = "http://localhost:8000"
+
+    # ---- Database ----
+    database_url: str = "postgresql+asyncpg://slick:change-me-postgres@slick-postgres:5432/slick_hq"
+    database_url_sync: str = (
+        "postgresql+psycopg://slick:change-me-postgres@slick-postgres:5432/slick_hq"
+    )
+
+    # ---- Redis ----
+    redis_url: str = "redis://slick-redis:6379/0"
+
+    # ---- Model provider ----
+    model_provider: str = "anthropic"
+    anthropic_api_key: str = ""
+    model_cheap: str = "claude-haiku-4"
+    model_smart: str = "claude-sonnet-4"
+    model_mock_mode: bool = True
+
+    # ---- Cost control ----
+    cost_budget_usd: float = 200.0
+    cost_alert_step_usd: float = 20.0
+    cost_hard_cap_usd: float = 200.0
+
+    # ---- Discord ----
+    discord_bot_token: str = ""
+    discord_guild_id: str = ""
+    discord_bot_name: str = "Sheriff S"
+    discord_channels: str = (
+        "slick-control,sheriff-s,agent-updates,approvals,costs,github-prs,system-alerts,business-ideas"
+    )
+
+    # ---- GitHub ----
+    github_pat: str = ""
+    github_owner: str = ""
+    github_repo: str = "slick-enterprises"
+    github_default_branch: str = "main"
+    github_allow_direct_push_to_main: bool = False
+
+    # ---- OpenClaw bridge ----
+    openclaw_mode: str = "mock"
+    openclaw_base_url: str = "http://slick-openclaw-bridge:8100"
+    openclaw_api_key: str = ""
+
+    # ---- Hermes bridge ----
+    hermes_mode: str = "mock"
+    hermes_base_url: str = "http://slick-hermes-bridge:8200"
+    hermes_api_key: str = ""
+    hermes_data_dir: str = "/data/hermes"
+
+    # ---- Sandbox runner ----
+    sandbox_base_url: str = "http://slick-sandbox-runner:8300"
+    sandbox_require_approval_for_dangerous: bool = True
+
+    @property
+    def discord_channel_list(self) -> list[str]:
+        return [c.strip() for c in self.discord_channels.split(",") if c.strip()]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Return a cached Settings instance."""
+    return Settings()

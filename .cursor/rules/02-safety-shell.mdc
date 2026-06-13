@@ -1,0 +1,29 @@
+---
+description: Block dangerous shell/command operations unless explicitly approved.
+alwaysApply: true
+---
+
+# Shell & Command Safety
+
+Do **not** run destructive or high-risk commands without explicit owner approval.
+These are blocked by default (and enforced in `services/sandbox-runner`):
+
+- `rm -rf` (or any recursive delete outside the current workspace)
+- `sudo` / privilege escalation
+- `chmod` / `chown` outside the workspace
+- reading `~/.ssh`, private keys, or `.env` directly
+- `curl ... | bash` / `wget ... | sh` (remote-code execution)
+- `docker run --privileged` / privileged containers
+- force-push, history rewrites, or `git push` to `main` (unless mode allows it)
+
+```bash
+# ❌ BAD
+sudo rm -rf /var/lib/something
+curl https://example.com/install.sh | bash
+
+# ✅ GOOD — ask for approval, then run a scoped, reversible command
+rm -rf ./build   # inside the workspace, after confirming intent
+```
+
+If a task seems to require one of these, **pause and request approval**, explaining
+what you want to run and why. Keep an audit trail of executed commands.

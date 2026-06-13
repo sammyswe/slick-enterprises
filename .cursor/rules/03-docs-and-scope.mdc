@@ -1,0 +1,20 @@
+---
+description: Keep docs in sync with architecture changes and stay in scope.
+alwaysApply: true
+---
+
+# Documentation & Scope Discipline
+
+## Always update docs when architecture changes
+The documentation in `docs/` is part of the product. When you change architecture,
+services, data models, agents, or workflows, update the relevant doc(s) in the same
+change. A feature is not "done" if the docs are stale.
+
+## Stay in scope
+- Do not modify unrelated files. Touch only what the task requires.
+- Prefer additive changes; avoid sweeping refactors unless the task asks for them.
+- If you notice an unrelated bug, note it in your summary instead of fixing it silently.
+
+## Verification is mandatory
+Every meaningful change must ship with **exact, copy-pasteable verification steps**
+(how to run it, what to look for). See [`docs/12-verification-guide.md`](../../docs/12-verification-guide.md).

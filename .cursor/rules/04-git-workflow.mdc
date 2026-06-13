@@ -1,0 +1,24 @@
+---
+description: Git hygiene for agents working in this repo.
+globs: "**/*"
+alwaysApply: false
+---
+
+# Git Hygiene
+
+- Check `git status` before starting work.
+- Use clear branches for agent work: `agent/<role>/<short-task>` or
+  `business/<slug>/<short-task>`.
+- Commit meaningful units of work with clear messages; include task artifacts and
+  verification steps in the PR/commit body.
+- Do **not** push directly to `main` unless the mode explicitly allows it
+  (`GITHUB_ALLOW_DIRECT_PUSH_TO_MAIN=true`). Prefer a PR-style workflow.
+- Never commit secrets (see `01-no-secrets`).
+
+```bash
+git checkout -b agent/coder/add-health-endpoint
+git add apps/gateway/gateway/main.py
+git commit -m "feat(gateway): add /health endpoint with db + redis checks"
+```
+
+See [`docs/09-github-workflow.md`](../../docs/09-github-workflow.md) for the full flow.
