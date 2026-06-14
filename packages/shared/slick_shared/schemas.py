@@ -81,10 +81,44 @@ class CostEventOut(ORMModel):
     tokens_out: int
     estimated_cost: float
     purpose: str
+    meta: dict = Field(default_factory=dict)
     created_at: datetime
 
 
+class CursorAccountUsage(BaseModel):
+    """Billing-cycle figures synced from the Cursor usage dashboard."""
+
+    configured: bool = False
+    sync_status: str = "not_configured"  # ok | error | not_configured
+    sync_error: str = ""
+    last_synced_at: str | None = None
+    plan_name: str = ""
+    billing_cycle_start: str | None = None
+    billing_cycle_end: str | None = None
+    total_spend_cents: int = 0
+    included_spend_cents: int = 0
+    limit_cents: int = 0
+    remaining_cents: int = 0
+    total_percent_used: float = 0.0
+    auto_percent_used: float = 0.0
+    api_percent_used: float = 0.0
+    on_demand_spend_cents: int = 0
+    on_demand_limit_cents: int = 0
+    display_message: str = ""
+
+
+class HqFactoryRuns(BaseModel):
+    """HQ-initiated Composer runs (attribution, not full account billing)."""
+
+    total_runs: int = 0
+    total_duration_ms: int = 0
+    by_purpose: dict[str, int] = Field(default_factory=dict)
+    by_model_runs: dict[str, int] = Field(default_factory=dict)
+    by_business_runs: dict[str, int] = Field(default_factory=dict)
+
+
 class CostSummary(BaseModel):
+    billing_model: str = "anthropic"  # cursor | anthropic | mock
     budget_usd: float
     spent_usd: float
     remaining_usd: float
@@ -93,6 +127,16 @@ class CostSummary(BaseModel):
     paused: bool
     by_business: dict[str, float] = Field(default_factory=dict)
     by_model: dict[str, float] = Field(default_factory=dict)
+    # Cursor: account-level dashboard sync + HQ factory attribution.
+    cursor_account_usage: CursorAccountUsage = Field(default_factory=CursorAccountUsage)
+    hq_factory_runs: HqFactoryRuns = Field(default_factory=HqFactoryRuns)
+    # Back-compat flat fields (mirror hq_factory_runs).
+    total_runs: int = 0
+    total_duration_ms: int = 0
+    by_purpose: dict[str, int] = Field(default_factory=dict)
+    by_model_runs: dict[str, int] = Field(default_factory=dict)
+    by_business_runs: dict[str, int] = Field(default_factory=dict)
+    cursor_dashboard_url: str = "https://cursor.com/dashboard?tab=usage"
 
 
 # ---- Skills ------------------------------------------------------------------

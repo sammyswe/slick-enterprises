@@ -48,6 +48,44 @@ def test_parse_valid_fenced_plan():
     assert [t["id"] for t in tasks] == ["t1", "t2", "t3"]
 
 
+def test_parse_agent_team_fields():
+    raw = """
+    {
+      "name": "Affiliate Ops",
+      "slug": "affiliate-ops",
+      "vision": "Agents run affiliate research and publishing.",
+      "business_model": "Amazon affiliate commissions",
+      "operating_loop": ["research", "write", "publish"],
+      "agents": [{
+        "role": "lead-researcher",
+        "name": "Scout",
+        "concern": "find products",
+        "skills": ["skills/agents/researcher/scout.md"],
+        "rules": ["no auto-posting"],
+        "mcp_servers": [{"name": "browser", "command": "npx", "args": ["mcp"]}],
+        "tools": ["hermes"],
+        "integrations": ["amazon"],
+        "hands_off_to": ["writer"]
+      }],
+      "handoffs": [{"from": "lead-researcher", "to": "writer", "artifact": "brief.md"}],
+      "milestones": [{"id": "m1", "title": "Provision", "tasks": [{
+        "id": "t1", "title": "Wire scout", "agent_role": "lead-researcher",
+        "task_type": "provision", "depends_on": [],
+        "acceptance_criteria": ["profile exists"], "verify_commands": ["true"]
+      }]}]
+    }
+    """
+    plan = parse_plan(raw, default_name="X", default_slug="x", idea="idea")
+    assert plan is not None
+    agent = plan["agents"][0]
+    assert agent["role"] == "lead-researcher"
+    assert agent["concern"] == "find products"
+    assert agent["mcp_servers"][0]["name"] == "browser"
+    assert plan["handoffs"][0]["artifact"] == "brief.md"
+    task = iter_tasks(plan)[0]
+    assert task["task_type"] == "provision"
+
+
 def test_parse_returns_none_without_json():
     assert parse_plan("no json here, just prose", default_name="X", default_slug="x", idea="i") is None
 

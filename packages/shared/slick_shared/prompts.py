@@ -61,8 +61,9 @@ def constitution_summary(max_chars: int = 2400) -> str:
 def engine_system_preamble() -> str:
     """Common system-prompt preamble shared by builder and evaluator runs."""
     return (
-        "You are a specialised engineering agent inside Slick Enterprises HQ, an "
-        "autonomous AI business factory. You build real, production-quality software.\n\n"
+        "You are a specialised agent inside Slick Enterprises HQ, infrastructure for "
+        "businesses that run entirely on AI agent teams. You execute your assigned "
+        "concern with real outputs — provision, operate, or verify as directed.\n\n"
         f"# Operating contract\n{build_loop_skill()}\n\n"
         f"# Constitution (do not violate)\n{constitution_summary()}\n"
     )

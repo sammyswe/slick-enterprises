@@ -1,49 +1,47 @@
 # 00 · Overview
 
-**Slick Enterprises HQ** is a personal **AI business factory** that runs on your own
-miniPC. You describe an online business or software idea conversationally; the system
-turns it into working software through a coordinated team of AI agents — with cost
-tracking, GitHub integration, and safety rails baked in.
+**Slick Enterprises HQ** is personal **infrastructure for AI-run businesses** on your own
+miniPC. You describe a business idea conversationally; the system designs an **agent
+team** with separated concerns, wires skills/rules/MCP per agent, provisions the
+compartment, and runs operational cycles — with cost tracking and safety rails baked in.
 
 ## The one-sentence vision
 
-> Give the system an idea. It asks clarifying questions, designs a business
-> compartment, assembles agents, builds the software, tracks cost, pushes to GitHub,
-> and keeps iterating until the work is complete, blocked, unsafe, or over budget.
+> Give the system an idea. It asks how to design the agent team, drafts a plan with
+> roles, skills, rules, and integrations, provisions the crew, runs the business loop,
+> tracks cost against your Cursor dashboard, and keeps iterating until the work is
+> complete, blocked, unsafe, or over budget.
 
 ## Who's who
 
 - **You (the Owner)** — describe ideas, approve high-risk actions, set budget.
-- **Sheriff S** — the top-level agent and your single point of contact. Unpacks ideas,
-  asks questions, coordinates everything, and reports back in plain language.
-- **Business Manager Agents** — one per business; Sheriff S talks to these, not to
-  every sub-agent.
-- **Global agents** — reusable across all businesses (cost controller, skill curator,
-  evaluator, architects, devops, github, ui-designer, database-designer, …).
-- **Business agents** — instantiated per business from role templates (coder, tester,
-  reviewer, researcher, scraper, notifier, database-agent, …).
+- **Sheriff S** — top-level coordinator and your single Discord contact. Designs agent
+  teams, coordinates provisioning and operations, reports in plain language.
+- **Business Manager Agents** — one per business; Sheriff S routes through these.
+- **Global agents** — reusable across businesses (cost controller, skill curator,
+  evaluator, architects, devops, github, …).
+- **Business agents** — instantiated per business from the **agent team plan** (dynamic
+  roles with concerns, skills, rules, MCP, and integrations).
 
 ## Mental model: a spaceship of rooms
 
 The eventual UI is a **spaceship** (see [`10-ui-vision.md`](10-ui-vision.md)):
 
-- Each **business** is a **room**.
+- Each **business** is a **room** run by its agent team.
 - **Global areas** are communal rooms.
-- **Agents** are futuristic robot characters you can click to inspect status, skills,
-  tools, MCP servers, permissions, cost, current work, and history.
+- **Agents** are characters you inspect for status, skills, tools, MCP servers,
+  permissions, cost, current work, and history.
 
 v1 ships a simple admin dashboard plus a `/spaceship` placeholder.
 
 ## What v1 is (and isn't)
 
-**v1 is** the infrastructure + orchestration scaffold:
-repo structure, docs, Docker Compose, FastAPI gateway, Postgres models, Redis queue,
-Next.js UI, Discord bot skeleton, agent registry, business compartment template,
-Sheriff S task-flow skeleton, cost tracking, OpenClaw/Hermes bridges, and an example
-business compartment.
+**v1 is** agent-team infrastructure: repo structure, docs, Docker Compose, gateway,
+Postgres, Redis, Next.js UI, Discord bot, agent registry, compartment template,
+Sheriff S agent-team flow, Cursor usage sync, cost tracking, OpenClaw/Hermes bridges.
 
-**v1 is not** a set of real money-making businesses. It is the foundation that makes
-building them repeatable and safe.
+**v1 is not** a portfolio of live money-making businesses. It is the foundation that
+makes agent-run businesses repeatable and safe.
 
 ## Document map
 

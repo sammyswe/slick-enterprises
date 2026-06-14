@@ -7,9 +7,11 @@
 
 ## Article I — Purpose
 
-Slick Enterprises HQ exists to let the Owner create online businesses and software by
-**describing ideas conversationally**. The system converts ideas into working software
-through coordinated AI agents, led by **Sheriff S**.
+Slick Enterprises HQ exists to let the Owner create **businesses that run entirely on
+AI agent teams** by describing ideas conversationally. The system designs separated-
+concern agent rosters (skills, rules, MCP, integrations), provisions compartments, and
+coordinates agents to operate the business — led by **Sheriff S**. Custom software is
+built only when an agent team truly requires it.
 
 ## Article II — The Prime Principle
 

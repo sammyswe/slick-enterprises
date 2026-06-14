@@ -25,6 +25,7 @@ class CompletionRequest:
     model: str | None = None  # None => use the cheap model
     max_tokens: int = 1024
     purpose: str = ""  # e.g. "clarifying-questions", "code", "review"
+    mcp_servers: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -185,8 +186,10 @@ class CursorProvider:
                 api_key=self.settings.cursor_api_key,
                 local=LocalAgentOptions(cwd=cwd),
             ) as agent:
-                # `mode` is a per-send option in this SDK version (plan = no edits).
-                run = await agent.send(message, SendOptions(mode=mode))
+                send_opts: dict = {"mode": mode}
+                if req.mcp_servers:
+                    send_opts["mcp_servers"] = req.mcp_servers
+                run = await agent.send(message, SendOptions(**send_opts))
                 result = await run.wait()
                 text = (getattr(result, "result", None) or await run.text() or "").strip()
 

@@ -1,7 +1,7 @@
 # Slick Enterprises HQ - developer convenience targets
 COMPOSE := docker compose -f infra/docker/docker-compose.yml
 
-.PHONY: help up down build logs ps restart migrate revision seed health ui-dev gateway-dev fmt test clean
+.PHONY: help up down build logs ps restart migrate revision seed health dashboard ui-dev gateway-dev fmt test clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -35,6 +35,9 @@ seed: ## Seed the example business compartment + agents
 
 health: ## Curl the gateway health endpoint
 	curl -s http://localhost:8000/health | python3 -m json.tool
+
+dashboard: ## Start stack (if needed) and open the UI at http://localhost:3000
+	./dashboard --start
 
 ui-dev: ## Run the Next.js UI locally (outside docker)
 	cd apps/ui && npm install && npm run dev

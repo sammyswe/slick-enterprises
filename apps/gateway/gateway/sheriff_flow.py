@@ -12,6 +12,7 @@ import re
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from slick_shared.agent_context import profile_path_for
 from slick_shared.buildplan import (
     PLAN_JSON_CONTRACT,
     fallback_plan,
@@ -34,7 +35,7 @@ from slick_shared.models import (
 )
 from slick_shared.schemas import SheriffReply, SheriffSummary
 
-from .compartment import create_compartment_files
+from .compartment import create_compartment_files, write_agent_profiles
 
 # Default agent team proposed for a new business compartment.
 DEFAULT_TEAM = [
@@ -54,17 +55,21 @@ _NUMBERED_QUESTION = re.compile(r"^\s*(?:\*\*)?(\d+)[\.\)]\s*(.+?\?)\s*(?:\*\*)?
 _PLAIN_QUESTION = re.compile(r"^\s*(?:[-*]\s*)?(.+\?)\s*$")
 
 DEFAULT_CLARIFYING_QUESTIONS = [
-    "Who is the target customer, and what problem does this solve for them?",
-    "What is the single most important outcome for v1?",
-    "What data sources, APIs, or integrations are required?",
-    "How will you measure success in the first 2–4 weeks?",
-    "Any hard constraints (budget, deadline, compliance, or tech)?",
+    "What is the core operating loop (inputs → actions → outputs → revenue) for this business?",
+    "Which concerns must be separate agents (research, outreach, fulfillment, billing, support)?",
+    "What external systems or APIs must agents integrate with?",
+    "What decisions need your approval vs full agent autonomy?",
+    "What does a successful v1 operational cycle look like (not tech stack)?",
 ]
 
 CLARIFYING_SYSTEM = (
     "You are Sheriff S, a friendly coordinator in Slick Enterprises HQ. "
-    "Your ONLY job is to ask clarifying questions about a new business idea. "
-    "Do NOT plan, build, mention MCP/tools, or comment on the codebase. "
+    "Your ONLY job is to ask clarifying questions about how to design an AI AGENT TEAM "
+    "that will run this business. Focus on: separated concerns, integrations (APIs, "
+    "platforms, MCP tools), skills/rules each agent needs, handoffs between agents, "
+    "and what v1 operations look like. "
+    "Do NOT ask about frameworks, databases, or code scaffolding unless the owner "
+    "explicitly needs custom software built. "
     "Output ONLY a numbered list of 3–5 questions, one per line, each ending with ? "
     "Format exactly:\n"
     "1. First question?\n"
@@ -136,9 +141,9 @@ def extract_clarifying_questions(text: str) -> list[str]:
 def format_clarifying_reply(questions: list[str]) -> str:
     body = "\n".join(questions) if questions else "\n".join(DEFAULT_CLARIFYING_QUESTIONS)
     return (
-        "🤠 Howdy! Love the idea. Before I wake the crew, a few quick questions:\n\n"
+        "🤠 Howdy! Love the idea. Before I design the agent team, a few quick questions:\n\n"
         f"{body}\n\n"
-        'Reply with answers, then say *"approved"* and I\'ll build the compartment.'
+        'Reply with answers, then say *"approved"* and I\'ll draft the agent team plan.'
     )
 
 
@@ -205,10 +210,12 @@ async def propose_business_identity(session: AsyncSession, task: Task) -> tuple[
 
 
 PLANNER_SYSTEM = (
-    "You are the Planner for Slick Enterprises HQ — a principal engineer who turns an "
-    "approved business idea into a concrete, buildable software project that can make "
-    "money. Design a tailored specialised-agent roster and a milestone + task DAG where "
-    "independent tasks can run in parallel. Be ambitious but realistic for a v1.\n\n"
+    "You are the Agent Team Designer for Slick Enterprises HQ — an operations architect "
+    "who turns an approved business idea into a concrete AGENT TEAM PLAN. Businesses here "
+    "run entirely on AI agents with separated concerns. Each agent needs: role, concern, "
+    "skills, rules, MCP servers, tools, and integrations. Design handoffs between agents "
+    "and a milestone + task DAG with task_type provision|operate|verify. "
+    "Only include software/coding tasks when custom code is truly required.\n\n"
     f"# Operating contract\n{build_loop_skill()}\n\n"
     f"# Output format\n{PLAN_JSON_CONTRACT}"
 )
@@ -246,29 +253,44 @@ async def propose_build_plan(
 
 
 def format_plan_reply(plan: dict, business: Business) -> str:
-    """Human-readable plan summary posted to Discord for the second approval gate."""
+    """Human-readable agent team plan posted to Discord for the second approval gate."""
     agents = plan.get("agents", [])
     milestones = plan.get("milestones", [])
+    handoffs = plan.get("handoffs", [])
     task_count = sum(len(m.get("tasks", [])) for m in milestones)
 
     agent_lines = "\n".join(
-        f"• **{a.get('name', a['role'])}** (`{a['role']}`) — {a.get('responsibility', '')}".rstrip(" —")
+        (
+            f"• **{a.get('name', a['role'])}** (`{a['role']}`) — {a.get('concern', a.get('responsibility', ''))}"
+            + (
+                f"\n  Skills: {', '.join(a.get('skills') or []) or '—'}"
+                f" · MCP: {', '.join(m.get('name', '') for m in a.get('mcp_servers') or []) or '—'}"
+            )
+        ).rstrip(" —")
         for a in agents
     )
     milestone_lines = "\n".join(
         f"**M{i}. {m.get('title', m.get('id'))}** — {len(m.get('tasks', []))} task(s)"
         for i, m in enumerate(milestones, start=1)
     )
+    handoff_lines = "\n".join(
+        f"• `{h.get('from')}` → `{h.get('to')}`: {h.get('artifact', 'handoff')}"
+        for h in handoffs
+    ) or "• (none yet)"
     stack = ", ".join(plan.get("stack", [])) or "TBD"
+    loop = " → ".join(plan.get("operating_loop", [])) or "TBD"
 
     return (
-        f"🗺️ **Build plan for {business.name}** (`{business.slug}`)\n\n"
+        f"🗺️ **Agent team plan for {business.name}** (`{business.slug}`)\n\n"
         f"**Vision:** {plan.get('vision', '')}\n\n"
-        f"**Stack:** {stack}\n\n"
+        f"**Business model:** {plan.get('business_model', '')}\n\n"
+        f"**Operating loop:** {loop}\n\n"
+        f"**Stack / integrations:** {stack}\n\n"
         f"**Agent crew ({len(agents)}):**\n{agent_lines}\n\n"
+        f"**Handoffs:**\n{handoff_lines}\n\n"
         f"**Milestones ({len(milestones)}, {task_count} tasks):**\n{milestone_lines}\n\n"
-        'Reply **"build it"** (or *approved*) to start the autonomous build, '
-        "and watch **#agent-updates** for live progress."
+        'Reply **"build it"** (or *approved*) to provision the team and start the first '
+        "operational cycle. Watch **#agent-updates** for live progress."
     )
 
 
@@ -388,6 +410,7 @@ async def _generate_plan(session: AsyncSession, task: Task) -> SheriffReply:
 
     await _staff_roster(session, business, plan)
     create_compartment_files(business.slug, business.name, plan.get("vision", business.description))
+    write_agent_profiles(business.slug, plan)
 
     # Turn the idea task into the umbrella task and create the child task DAG.
     task.business_id = business.id
@@ -417,8 +440,9 @@ async def _start_build(session: AsyncSession, task: Task) -> SheriffReply:
         business = await session.get(Business, task.business_id)
         business_name = business.name if business else ""
     reply = (
-        f"🤠 Approved! The crew for **{business_name or 'your business'}** is building now. "
-        "Watch **#agent-updates** for live per-agent progress, test results, and the final report."
+        f"🤠 Approved! The agent team for **{business_name or 'your business'}** is provisioning "
+        "and running the first operational cycle now. "
+        "Watch **#agent-updates** for per-agent progress and the final report."
     )
     return SheriffReply(reply=reply, task_id=task.id, needs_approval=False)
 
@@ -426,8 +450,10 @@ async def _start_build(session: AsyncSession, task: Task) -> SheriffReply:
 async def _staff_roster(session: AsyncSession, business: Business, plan: dict) -> None:
     """Create the dynamic, plan-specific agent roster so it shows up in /agents + UI."""
     roster = plan.get("agents") or [{"role": role, "name": name} for name, role in DEFAULT_TEAM]
+    slug = business.slug
     for agent in roster:
         role = agent.get("role", "agent")
+        rel_profile = profile_path_for(slug, role)
         session.add(
             Agent(
                 name=agent.get("name", role.title()),
@@ -435,8 +461,17 @@ async def _staff_roster(session: AsyncSession, business: Business, plan: dict) -
                 scope=AgentScope.business,
                 status=AgentStatus.sleeping,
                 business_id=business.id,
-                profile_path=f"agents/templates/{role}/AGENT.md",
-                permissions={"responsibility": agent.get("responsibility", "")},
+                profile_path=rel_profile,
+                skills=list(agent.get("skills") or []),
+                tools=list(agent.get("tools") or ["sandbox-runner", "hermes"]),
+                permissions={
+                    "responsibility": agent.get("responsibility", ""),
+                    "concern": agent.get("concern", ""),
+                    "rules": list(agent.get("rules") or []),
+                    "mcp_servers": list(agent.get("mcp_servers") or []),
+                    "integrations": list(agent.get("integrations") or []),
+                    "hands_off_to": list(agent.get("hands_off_to") or []),
+                },
             )
         )
 
@@ -459,7 +494,10 @@ async def _create_child_tasks(
                 depends_on=spec.get("depends_on", []),
                 acceptance_criteria=spec.get("acceptance_criteria", []),
                 plan_local_id=spec["id"],
-                requirements={"verify_commands": spec.get("verify_commands", [])},
+                requirements={
+                    "verify_commands": spec.get("verify_commands", []),
+                    "task_type": spec.get("task_type", "operate"),
+                },
             )
         )
     await session.flush()
@@ -490,8 +528,8 @@ async def build_summary(session: AsyncSession) -> SheriffSummary:
         "curl http://localhost:8000/costs/summary",
     ]
     nxt = [
-        "Answer any clarifying questions in Discord.",
-        "Approve a compartment to let the crew start building.",
+        "Answer agent-team design questions in Discord.",
+        "Approve a plan to provision the crew and run the first operational cycle.",
     ]
 
     text = (

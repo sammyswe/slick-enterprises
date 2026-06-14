@@ -27,3 +27,15 @@ export function statusColor(status: string): string {
 export function money(n: number): string {
   return `$${n.toFixed(2)}`;
 }
+
+export function formatDuration(ms: number): string {
+  if (!ms || ms < 0) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return rem ? `${m}m ${rem}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h}h ${rm}m` : `${h}h`;
+}

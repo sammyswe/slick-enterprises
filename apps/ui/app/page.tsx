@@ -4,7 +4,11 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useFetch } from "@/lib/useFetch";
 import { Card, PageHeader, Stat, StatusBadge } from "@/components/ui";
-import { money } from "@/lib/utils";
+import { money, formatDuration } from "@/lib/utils";
+
+function centsToDollars(cents: number): string {
+  return money(cents / 100);
+}
 
 export default function DashboardPage() {
   const businesses = useFetch(() => api.businesses());
@@ -28,9 +32,25 @@ export default function DashboardPage() {
         <Stat label="Agents" value={agents.data?.length ?? "—"} hint={`${activeAgents} active · ${sleeping} asleep ($0)`} />
         <Stat label="Tasks in progress" value={inProgress} />
         <Stat
-          label="Budget used"
-          value={cost.data ? money(cost.data.spent_usd) : "—"}
-          hint={cost.data ? `of ${money(cost.data.budget_usd)}${cost.data.paused ? " · PAUSED" : ""}` : undefined}
+          label={cost.data?.billing_model === "cursor" ? "Cursor spending" : "Budget used"}
+          value={
+            cost.data?.billing_model === "cursor"
+              ? cost.data.cursor_account_usage?.configured
+                ? `${(cost.data.cursor_account_usage.total_percent_used ?? 0).toFixed(1)}%`
+                : (cost.data.hq_factory_runs?.total_runs ?? cost.data.total_runs ?? "—")
+              : cost.data
+                ? money(cost.data.spent_usd)
+                : "—"
+          }
+          hint={
+            cost.data?.billing_model === "cursor"
+              ? cost.data.cursor_account_usage?.configured
+                ? `${centsToDollars(cost.data.cursor_account_usage.included_spend_cents)} included · dashboard sync`
+                : `${formatDuration(cost.data.total_duration_ms)} HQ runs · configure token to sync`
+              : cost.data
+                ? `of ${money(cost.data.budget_usd)}${cost.data.paused ? " · PAUSED" : ""}`
+                : undefined
+          }
         />
       </div>
 

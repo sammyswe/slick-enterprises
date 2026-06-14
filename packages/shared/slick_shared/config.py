@@ -70,6 +70,13 @@ class Settings(BaseSettings):
     # Model used for routine/cheap work vs. high-quality coding/review work.
     cursor_model_cheap: str = "auto"
     cursor_model_smart: str = "composer-2.5"
+    # Dashboard usage sync (Individual Max/Pro — see docs/08-cost-control.md).
+    # JWT bearer or WorkosCursorSessionToken cookie value from cursor.com.
+    cursor_access_token: str = ""
+    cursor_workos_session_token: str = ""
+    cursor_refresh_token: str = ""
+    # How often cost-controller polls Cursor dashboard usage (seconds).
+    cursor_usage_sync_interval_sec: int = 900
 
     # ---- Cost control ----
     cost_budget_usd: float = 200.0

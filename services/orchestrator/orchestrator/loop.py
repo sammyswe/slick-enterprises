@@ -27,7 +27,8 @@ from enum import Enum
 import httpx
 from sqlalchemy import select
 
-from slick_shared.buildplan import ready_tasks
+from slick_shared.agent_context import build_system_prompt, mcp_servers_for_sdk
+from slick_shared.buildplan import agent_by_role, ready_tasks
 from slick_shared.config import get_settings
 from slick_shared.cost import can_spend
 from slick_shared.db import get_sessionmaker
@@ -318,6 +319,17 @@ class BuildScheduler:
     # ---- engine + sandbox calls ----------------------------------------------
 
     async def _call_coding(self, spec: dict, *, persona: str, feedback: str) -> dict:
+        role = spec.get("agent_role", "")
+        agent_spec = agent_by_role(self.plan, role) or {}
+        system_prompt = build_system_prompt(
+            plan=self.plan,
+            business_slug=self.business_slug,
+            agent_role=role,
+            task_spec=spec,
+        )
+        mcp_servers = mcp_servers_for_sdk(agent_spec)
+        task_type = spec.get("task_type", "operate")
+
         url = f"{self.settings.hermes_base_url}/coding-tasks"
         payload = {
             "task_id": self.task_rows.get(spec["id"], self.umbrella_task_id),
@@ -325,14 +337,19 @@ class BuildScheduler:
             "repo_path": self.repo_path,
             "business_id": self.business_id,
             "context": (
-                f"Work inside businesses/{self.business_slug}/ for product code. "
+                f"Work inside businesses/{self.business_slug}/ for this business. "
                 "Never modify HQ infrastructure (apps/, services/, packages/, infra/, docs/, .env)."
             ),
-            "agent_role": spec.get("agent_role", ""),
+            "agent_role": role,
             "agent_persona": persona,
             "acceptance_criteria": spec.get("acceptance_criteria", []),
             "verify_commands": (spec.get("verify_commands") or self._verify_commands(spec)),
             "feedback": feedback,
+            "business_slug": self.business_slug,
+            "build_plan": self.plan,
+            "task_type": task_type,
+            "system_prompt": system_prompt,
+            "mcp_servers": mcp_servers,
         }
         try:
             async with httpx.AsyncClient(timeout=900) as client:
@@ -426,17 +443,19 @@ class BuildScheduler:
     def _build_report(self, passed: int, total: int, stop: StopReason) -> str:
         status_emoji = "✅" if passed == total and total else ("⚠️" if passed else "❌")
         lines = [
-            f"{status_emoji} **Build report — {self.label}** (`{self.business_slug}`)",
+            f"{status_emoji} **Agent team report — {self.label}** (`{self.business_slug}`)",
             "",
             f"**Milestones passed:** {passed}/{total}",
             f"**Composer runs used:** {self.runs} / {self.settings.build_max_composer_runs}",
             f"**Time:** {self.elapsed_min:.1f} / {self.settings.build_timeout_min} min",
             f"**Stop reason:** {stop.value}",
             "",
+            "**Business model:** " + (self.plan.get("business_model", "") or "n/a"),
+            "**Operating loop:** " + (" → ".join(self.plan.get("operating_loop", [])) or "n/a"),
             "**Stack:** " + (", ".join(self.plan.get("stack", [])) or "n/a"),
             "**Crew:** " + (", ".join(f"{a.get('name', a['role'])}" for a in self.plan.get("agents", [])) or "n/a"),
             "",
-            f"Code lives in `businesses/{self.business_slug}/`. "
+            f"Agent team lives in `businesses/{self.business_slug}/` (see AGENT_TEAM.md). "
             "Open the dashboard at http://localhost:3000 to inspect agents and tasks.",
         ]
         return "\n".join(lines)

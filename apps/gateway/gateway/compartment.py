@@ -12,6 +12,7 @@ import os
 import shutil
 from pathlib import Path
 
+from slick_shared.agent_context import build_agent_profile_markdown
 from slick_shared.logging import setup_logging
 
 logger = setup_logging("gateway.compartment")
@@ -57,6 +58,46 @@ def create_compartment_files(slug: str, name: str, description: str) -> Path | N
     except OSError as exc:  # pragma: no cover - depends on mount
         logger.warning("Could not create compartment files for %s: %s", slug, exc)
         return None
+
+
+def write_agent_profiles(slug: str, plan: dict) -> None:
+    """Write per-agent AGENT.md files and AGENT_TEAM.md from the build plan."""
+    target = businesses_dir() / slug
+    if not target.is_dir():
+        return
+    agents_dir = target / "agents"
+    agents_dir.mkdir(parents=True, exist_ok=True)
+
+    lines = [
+        f"# Agent team — {plan.get('name', slug)}",
+        "",
+        f"**Business model:** {plan.get('business_model', '')}",
+        "",
+        "## Operating loop",
+        "",
+    ]
+    for step in plan.get("operating_loop") or []:
+        lines.append(f"- {step}")
+    lines.extend(["", "## Roster", ""])
+    for agent in plan.get("agents") or []:
+        role = agent.get("role", "agent")
+        agent_dir = agents_dir / role
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        profile = build_agent_profile_markdown(agent, plan)
+        (agent_dir / "AGENT.md").write_text(profile + "\n", encoding="utf-8")
+        concern = agent.get("concern", agent.get("responsibility", ""))
+        mcp = ", ".join(m.get("name", "") for m in agent.get("mcp_servers") or []) or "—"
+        lines.append(
+            f"- **{agent.get('name', role)}** (`{role}`) — {concern} · MCP: {mcp}"
+        )
+    if plan.get("handoffs"):
+        lines.extend(["", "## Handoffs", ""])
+        for h in plan["handoffs"]:
+            lines.append(
+                f"- `{h.get('from')}` → `{h.get('to')}`: **{h.get('artifact', 'handoff')}**"
+            )
+    (target / "AGENT_TEAM.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    logger.info("Wrote agent profiles for %s (%d agents)", slug, len(plan.get("agents") or []))
 
 
 def _fill(path: Path, slug: str, name: str, description: str) -> None:

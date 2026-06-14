@@ -23,8 +23,9 @@ $COMPOSE run --rm slick-gateway python -m gateway.seed
 
 echo ""
 echo "✅ Slick HQ is up!"
-echo "   UI:      http://localhost:3000  (password: UI_ADMIN_PASSWORD in .env)"
-echo "   API:     http://localhost:8000/health"
-echo "   API docs http://localhost:8000/docs"
+echo "   Dashboard:  ./dashboard        (opens http://localhost:3000)"
+echo "   UI:         http://localhost:3000  (password: UI_ADMIN_PASSWORD in .env)"
+echo "   API:        http://localhost:8000/health"
+echo "   API docs:   http://localhost:8000/docs"
 echo ""
 $COMPOSE ps

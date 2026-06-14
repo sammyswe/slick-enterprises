@@ -171,6 +171,32 @@ class Task(Base, TimestampMixin):
     business: Mapped["Business | None"] = relationship(back_populates="tasks")
 
 
+class CursorUsageSnapshot(Base):
+    """Point-in-time sync of Cursor dashboard billing-cycle usage."""
+
+    __tablename__ = "cursor_usage_snapshots"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    billing_cycle_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    billing_cycle_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    total_spend_cents: Mapped[int] = mapped_column(Integer, default=0)
+    included_spend_cents: Mapped[int] = mapped_column(Integer, default=0)
+    bonus_spend_cents: Mapped[int] = mapped_column(Integer, default=0)
+    limit_cents: Mapped[int] = mapped_column(Integer, default=0)
+    remaining_cents: Mapped[int] = mapped_column(Integer, default=0)
+    total_percent_used: Mapped[float] = mapped_column(Float, default=0.0)
+    auto_percent_used: Mapped[float] = mapped_column(Float, default=0.0)
+    api_percent_used: Mapped[float] = mapped_column(Float, default=0.0)
+    on_demand_spend_cents: Mapped[int] = mapped_column(Integer, default=0)
+    on_demand_limit_cents: Mapped[int] = mapped_column(Integer, default=0)
+    plan_name: Mapped[str] = mapped_column(String(80), default="")
+    display_message: Mapped[str] = mapped_column(Text, default="")
+    raw: Mapped[dict] = mapped_column(JSONB, default=dict)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class CostEvent(Base, TimestampMixin):
     __tablename__ = "cost_events"
 
@@ -184,6 +210,8 @@ class CostEvent(Base, TimestampMixin):
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
     estimated_cost: Mapped[float] = mapped_column(Float, default=0.0)
     purpose: Mapped[str] = mapped_column(String(200), default="")
+    # Provider-specific metadata (Cursor: run_id, duration_ms, status, mode, runtime).
+    meta: Mapped[dict] = mapped_column(JSONB, default=dict)
 
 
 class SkillProposal(Base, TimestampMixin):

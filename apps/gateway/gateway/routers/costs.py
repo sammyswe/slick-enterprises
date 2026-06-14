@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from slick_shared.cost import build_summary
+from slick_shared.cursor_usage import sync_cursor_usage
 from slick_shared.db import get_session
 from slick_shared.models import CostEvent
 from slick_shared.schemas import CostEventOut, CostSummary
@@ -25,3 +26,14 @@ async def list_cost_events(limit: int = 100, session: AsyncSession = Depends(get
 @router.get("/summary", response_model=CostSummary)
 async def cost_summary(session: AsyncSession = Depends(get_session)):
     return await build_summary(session)
+
+
+@router.post("/sync-cursor", response_model=CostSummary)
+async def sync_cursor_usage_now(session: AsyncSession = Depends(get_session)):
+    """On-demand sync of Cursor dashboard billing-cycle usage."""
+    _, err = await sync_cursor_usage(session)
+    summary = await build_summary(session)
+    if err:
+        summary.cursor_account_usage.sync_status = "error"
+        summary.cursor_account_usage.sync_error = err
+    return summary

@@ -39,7 +39,36 @@ export type Task = {
   created_at: string;
 };
 
+export type CursorAccountUsage = {
+  configured: boolean;
+  sync_status: string;
+  sync_error: string;
+  last_synced_at: string | null;
+  plan_name: string;
+  billing_cycle_start: string | null;
+  billing_cycle_end: string | null;
+  total_spend_cents: number;
+  included_spend_cents: number;
+  limit_cents: number;
+  remaining_cents: number;
+  total_percent_used: number;
+  auto_percent_used: number;
+  api_percent_used: number;
+  on_demand_spend_cents: number;
+  on_demand_limit_cents: number;
+  display_message: string;
+};
+
+export type HqFactoryRuns = {
+  total_runs: number;
+  total_duration_ms: number;
+  by_purpose: Record<string, number>;
+  by_model_runs: Record<string, number>;
+  by_business_runs: Record<string, number>;
+};
+
 export type CostSummary = {
+  billing_model: string;
   budget_usd: number;
   spent_usd: number;
   remaining_usd: number;
@@ -48,6 +77,14 @@ export type CostSummary = {
   paused: boolean;
   by_business: Record<string, number>;
   by_model: Record<string, number>;
+  cursor_account_usage: CursorAccountUsage;
+  hq_factory_runs: HqFactoryRuns;
+  total_runs: number;
+  total_duration_ms: number;
+  by_purpose: Record<string, number>;
+  by_model_runs: Record<string, number>;
+  by_business_runs: Record<string, number>;
+  cursor_dashboard_url: string;
 };
 
 export type CostEvent = {
@@ -61,6 +98,7 @@ export type CostEvent = {
   tokens_out: number;
   estimated_cost: number;
   purpose: string;
+  meta: Record<string, unknown>;
   created_at: string;
 };
 
@@ -80,4 +118,11 @@ export const api = {
     getJSON<Task[]>(`/tasks${businessId ? `?business_id=${businessId}` : ""}`),
   costSummary: () => getJSON<CostSummary>("/costs/summary"),
   costEvents: () => getJSON<CostEvent[]>("/costs"),
+  syncCursorUsage: () =>
+    fetch(`${GATEWAY_URL}/costs/sync-cursor`, { method: "POST", cache: "no-store" }).then(
+      (res) => {
+        if (!res.ok) throw new Error(`/costs/sync-cursor -> ${res.status}`);
+        return res.json() as Promise<CostSummary>;
+      }
+    ),
 };

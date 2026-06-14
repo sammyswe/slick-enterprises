@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Open the Slick HQ dashboard (UI + API health check).
+# Usage: ./dashboard          — open UI if stack is already up
+#        ./dashboard --start   — build/start stack first, then open UI
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+COMPOSE="docker compose -f infra/docker/docker-compose.yml"
+UI_URL="http://localhost:3000"
+API_URL="http://localhost:8000"
+
+start_stack() {
+  echo "🤠 Starting Slick HQ..."
+  if [ -x "$ROOT/infra/scripts/start.sh" ]; then
+    "$ROOT/infra/scripts/start.sh"
+  else
+    $COMPOSE up -d --build slick-gateway slick-ui slick-postgres slick-redis
+    $COMPOSE run --rm slick-gateway alembic upgrade head
+  fi
+}
+
+ui_up() {
+  curl -sf -o /dev/null "$UI_URL/login" 2>/dev/null
+}
+
+gateway_up() {
+  curl -sf "$API_URL/health" 2>/dev/null | grep -q '"status"'
+}
+
+if [[ "${1:-}" == "--start" ]] || ! ui_up || ! gateway_up; then
+  start_stack
+  echo "⏳ Waiting for UI..."
+  for _ in $(seq 1 30); do
+    ui_up && gateway_up && break
+    sleep 2
+  done
+fi
+
+if ! ui_up; then
+  echo "❌ UI not reachable at $UI_URL"
+  echo "   Check: $COMPOSE ps slick-ui"
+  echo "   Logs:  $COMPOSE logs --tail=30 slick-ui"
+  exit 1
+fi
+
+echo ""
+echo "✅ Slick HQ dashboard"
+echo "   UI (sign in):  $UI_URL"
+echo "   API health:    $API_URL/health"
+echo "   API docs:      $API_URL/docs"
+echo ""
+echo "   Password: UI_ADMIN_PASSWORD in your .env file"
+echo ""
+echo "   Pages after login:"
+echo "     /              Command deck (overview)"
+echo "     /businesses    Business compartments"
+echo "     /agents        Agent roster + status"
+echo "     /tasks         Task queue"
+echo "     /costs         Budget & spend"
+echo "     /spaceship     Future mission control UI"
+echo ""
+
+if command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "$UI_URL" >/dev/null 2>&1 &
+  echo "🌐 Opened $UI_URL in your browser."
+elif command -v sensible-browser >/dev/null 2>&1; then
+  sensible-browser "$UI_URL" >/dev/null 2>&1 &
+  echo "🌐 Opened $UI_URL in your browser."
+else
+  echo "👉 Open this URL in your browser: $UI_URL"
+fi
