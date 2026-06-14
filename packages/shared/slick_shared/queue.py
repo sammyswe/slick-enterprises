@@ -22,8 +22,29 @@ _client: redis.Redis | None = None
 def get_redis() -> redis.Redis:
     global _client
     if _client is None:
-        _client = redis.from_url(get_settings().redis_url, decode_responses=True)
+        # socket_timeout=None lets a blocking BLPOP (server-side timeout) wait without
+        # the client read timing out first — redis-py 8.x applies a short default read
+        # timeout otherwise, which wedged the consumer loop. health_check_interval lets
+        # a connection that broke during a restart race self-heal.
+        _client = redis.from_url(
+            get_settings().redis_url,
+            decode_responses=True,
+            socket_timeout=None,
+            socket_keepalive=True,
+            health_check_interval=30,
+        )
     return _client
+
+
+async def reset_redis() -> None:
+    """Drop the cached client so the next call reconnects (used after errors)."""
+    global _client
+    if _client is not None:
+        try:
+            await _client.aclose()
+        except Exception:  # noqa: BLE001
+            pass
+        _client = None
 
 
 async def enqueue_task(payload: dict[str, Any]) -> None:

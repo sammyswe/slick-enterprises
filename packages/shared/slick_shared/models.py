@@ -148,6 +148,26 @@ class Task(Base, TimestampMixin):
     requirements: Mapped[dict] = mapped_column(JSONB, default=dict)
     result_summary: Mapped[str] = mapped_column(Text, default="")
 
+    # ---- Build-plan / DAG fields (self-building engine) ----
+    # The umbrella task represents a whole build; child tasks are the plan's units.
+    parent_task_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("tasks.id"), nullable=True, index=True
+    )
+    # umbrella | build | verify
+    kind: Mapped[str] = mapped_column(String(40), default="build")
+    # Milestone label/id this task belongs to.
+    milestone: Mapped[str] = mapped_column(String(120), default="")
+    # The specialised agent role responsible for this task.
+    agent_role: Mapped[str] = mapped_column(String(120), default="")
+    # Plan-local task ids this task depends on (must finish first).
+    depends_on: Mapped[list] = mapped_column(JSONB, default=list)
+    # Human/agent-checkable acceptance criteria for this task.
+    acceptance_criteria: Mapped[list] = mapped_column(JSONB, default=list)
+    # Plan-local id (e.g. "t1") used to resolve depends_on within a build.
+    plan_local_id: Mapped[str] = mapped_column(String(60), default="")
+    # How many rework cycles this task has gone through.
+    rework_count: Mapped[int] = mapped_column(Integer, default=0)
+
     business: Mapped["Business | None"] = relationship(back_populates="tasks")
 
 

@@ -31,14 +31,44 @@ APPROVAL_CHANNEL = "approvals"
 EVENT_CHANNEL_MAP = {
     "cost_alert": "costs",
     "budget_hard_cap": "system-alerts",
+    # Build plan goes to #approvals for the second approval gate.
+    "build_plan": "approvals",
+    # Live self-building engine progress -> #agent-updates.
+    "task_started": "agent-updates",
+    "task_progress": "agent-updates",
+    "wave_started": "agent-updates",
+    "agent_task": "agent-updates",
+    "evaluation": "agent-updates",
+    "milestone_done": "agent-updates",
+    "build_report": "agent-updates",
     "task_finished": "agent-updates",
     "skills_synced": "github-prs",
 }
 
+DISCORD_MESSAGE_LIMIT = 1900
+
+
+def chunk_discord_message(text: str, limit: int = DISCORD_MESSAGE_LIMIT) -> list[str]:
+    """Split long Sheriff replies so Discord doesn't truncate mid-question."""
+    if len(text) <= limit:
+        return [text]
+    chunks: list[str] = []
+    current = ""
+    for line in text.splitlines(keepends=True):
+        if len(current) + len(line) > limit and current:
+            chunks.append(current.rstrip())
+            current = line
+        else:
+            current += line
+    if current.strip():
+        chunks.append(current.rstrip())
+    return chunks or [text[:limit]]
+
 
 async def _post_sheriff(channel: str, author: str, content: str) -> dict:
     url = f"{settings.gateway_public_url}/sheriff/message"
-    async with httpx.AsyncClient(timeout=30) as client:
+    # Composer clarifying-question runs can take 30–60s; keep headroom.
+    async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.post(
             url, json={"channel": channel, "author": author, "content": content}
         )
@@ -89,7 +119,8 @@ def build_bot():
             for guild in client.guilds:
                 ch = await channel_by_name(guild, channel_name)
                 if ch:
-                    await ch.send(text)
+                    for chunk in chunk_discord_message(text):
+                        await ch.send(chunk)
 
     @client.event
     async def on_ready():
@@ -107,7 +138,8 @@ def build_bot():
             try:
                 data = await _post_sheriff(channel_name, str(message.author), message.content)
                 reply = data.get("reply", "🤠 (no reply)")
-                await message.channel.send(reply[:1900])
+                for chunk in chunk_discord_message(reply):
+                    await message.channel.send(chunk)
             except Exception as exc:  # pragma: no cover
                 logger.warning("Sheriff call failed: %s", exc)
                 await message.channel.send("🤠 I hit a snag reaching the gateway. Check the logs.")

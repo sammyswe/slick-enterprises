@@ -1,0 +1,52 @@
+{
+  "accounts": [
+    {
+      "id": "pool-paradise",
+      "handle": "poolparadise_finds",
+      "niche": "pool floats",
+      "product_title": "Giant Inflatable Pool Float Lounger"
+    },
+    {
+      "id": "cool-breeze",
+      "handle": "coolbreeze_hacks",
+      "niche": "portable cooling",
+      "product_title": "Portable Misting Fan with LED"
+    },
+    {
+      "id": "shore-kit",
+      "handle": "shorekit_essentials",
+      "niche": "beach kits",
+      "product_title": "Sand-Proof Beach Essentials Kit"
+    }
+  ],
+  "sample_trends": [
+    {
+      "keyword": "giant pool float reveal",
+      "momentum": "rising",
+      "reference_sound": "original sound - float reveal beat drop",
+      "mirror_format": "before_after_reveal",
+      "example_hook": "Wait till you see what fits in this box 😳"
+    },
+    {
+      "keyword": "heat wave survival kit",
+      "momentum": "rising",
+      "reference_sound": "dramatic heat meme audio",
+      "mirror_format": "voiceover_meme",
+      "example_hook": "Texas summer checked in early 💀"
+    }
+  ],
+  "sample_pipeline": [
+    "Product Analyst → score products",
+    "TikTok Trend Scout → sounds + mirror formats",
+    "Content Strategist → trend-mirror briefs",
+    "Content Creator → Higgsfield render export",
+    "Affiliate Reviewer → #ad compliance",
+    "Publisher → Owner-approved post",
+    "Performance Analyst → view rankings"
+  ],
+  "sample_recommendation": {
+    "account_id": "pool-paradise",
+    "recommended_formats": ["trend_remix", "pov_summer_hack", "before_after_reveal"],
+    "rationale": "Formats with highest average views — double down on trend mirrors."
+  }
+}

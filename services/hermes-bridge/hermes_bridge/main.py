@@ -11,6 +11,10 @@ from .client import (
     CodingTask,
     CommandRequest,
     CommandResult,
+    EvaluationRequest,
+    EvaluationResult,
+    PlanRequest,
+    PlanResult,
     SkillContext,
     SkillProposalDraft,
     get_client,
@@ -33,6 +37,16 @@ async def health() -> dict:
 @app.post("/coding-tasks", response_model=CodingResult)
 async def run_coding_task(task: CodingTask) -> CodingResult:
     return await get_client().run_coding_task(task)
+
+
+@app.post("/plan", response_model=PlanResult)
+async def plan_project(req: PlanRequest) -> PlanResult:
+    return await get_client().plan_project(req)
+
+
+@app.post("/evaluate", response_model=EvaluationResult)
+async def evaluate_work(req: EvaluationRequest) -> EvaluationResult:
+    return await get_client().evaluate_work(req)
 
 
 @app.post("/skills/propose", response_model=SkillProposalDraft)

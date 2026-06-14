@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acme Analytics — Pricing</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    .pricing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+    .pricing-tier { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; }
+    .plan-price { font-size: 2rem; font-weight: 700; color: #2563eb; }
+  </style>
+</head>
+<body>
+  <h1>Acme Analytics Pricing</h1>
+  <p>Static HTML pricing page for local demo and QA.</p>
+  <div class="pricing-grid">
+    <div class="pricing-tier" data-plan="starter">
+      <h2>Starter</h2>
+      <span class="plan-price">$29.00</span>
+      <p>Up to 5 competitors</p>
+    </div>
+    <div class="pricing-tier" data-plan="pro">
+      <h2>Pro</h2>
+      <span class="plan-price">$79.00</span>
+      <p>Unlimited competitors</p>
+    </div>
+    <div class="pricing-tier" data-plan="enterprise">
+      <h2>Enterprise</h2>
+      <span class="plan-price">$199.00</span>
+      <p>Custom integrations</p>
+    </div>
+  </div>
+</body>
+</html>

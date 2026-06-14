@@ -3,6 +3,24 @@
 Cost control is a first-class safety system. The `cost-controller` service and the
 `slick_shared.llm` layer cooperate so spend is always logged and bounded.
 
+## Two billing models (pick one via `MODEL_PROVIDER`)
+
+| Provider | How you pay | What HQ can measure |
+|----------|-------------|---------------------|
+| `cursor` (default) | **Your Cursor subscription.** SDK runs draw from the same plan/request pool as the IDE. | Run count, model, duration, status per call. **Not** dollars — the Cursor SDK returns no token or cost figure. |
+| `anthropic` | Pay-per-token, billed by Anthropic. | Exact tokens in/out and an estimated dollar cost per call. |
+
+**Why this matters:** when `MODEL_PROVIDER=cursor`, "cost" is a *usage* signal, not a
+hard dollar meter. The authoritative dollar figure is in your **Cursor usage
+dashboard** (filter by the **SDK** tag at
+[cursor.com/dashboard](https://cursor.com/dashboard)). HQ records each run as a
+`CostEvent` with `estimated_cost = 0` and the run metadata (`cursor_run_id`,
+`duration_ms`, `status`, `runtime`) in `meta`, so the dashboard shows **how much
+the factory is using Composer**, and you reconcile dollars in Cursor.
+
+With `MODEL_PROVIDER=anthropic`, the budget/alert/hard-cap settings below behave as
+true dollar limits (per-token estimation, see "How estimation works").
+
 ## Budget rules (v1)
 
 | Setting | Default | Meaning |

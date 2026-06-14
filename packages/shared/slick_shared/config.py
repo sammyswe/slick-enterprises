@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     env: str = "development"
     log_level: str = "INFO"
     tz: str = "Europe/London"
+    # Repo root inside the container; the repo is mounted here so services can read
+    # docs/, skills/, and businesses/. Set via SLICK_REPO_ROOT in compose.
+    slick_repo_root: str = "/workspace"
 
     # ---- UI auth ----
     ui_admin_password: str = "change-me-please"
@@ -46,16 +49,42 @@ class Settings(BaseSettings):
     redis_url: str = "redis://slick-redis:6379/0"
 
     # ---- Model provider ----
+    # "cursor"  -> Cursor SDK (Composer); billed against your Cursor subscription.
+    # "anthropic" -> direct Anthropic API (pay-per-token).
+    # "mock"    -> deterministic, zero-cost responses (also forced by model_mock_mode).
     model_provider: str = "anthropic"
     anthropic_api_key: str = ""
     model_cheap: str = "claude-haiku-4"
     model_smart: str = "claude-sonnet-4"
     model_mock_mode: bool = True
 
+    # ---- Cursor SDK (Composer) ----
+    # Key minted at https://cursor.com/dashboard/integrations (prefix `crsr_`).
+    # SDK runs bill against the same plan/request pool as the IDE; spend appears
+    # in the Cursor usage dashboard under the "SDK" tag (no per-call $ is returned).
+    cursor_api_key: str = ""
+    # "local" runs Composer on this machine against cursor_workspace_dir.
+    # "cloud" runs on a Cursor-hosted VM against a cloned GitHub repo (PRs).
+    cursor_runtime: str = "local"
+    cursor_workspace_dir: str = "/workspace"
+    # Model used for routine/cheap work vs. high-quality coding/review work.
+    cursor_model_cheap: str = "auto"
+    cursor_model_smart: str = "composer-2.5"
+
     # ---- Cost control ----
     cost_budget_usd: float = 200.0
     cost_alert_step_usd: float = 20.0
     cost_hard_cap_usd: float = 200.0
+
+    # ---- Self-building engine (autonomous build bounds) ----
+    # Max specialised-agent tasks running concurrently within one build.
+    build_max_concurrency: int = 3
+    # Hard ceiling on Composer runs for a single build (planner + builders + evaluators).
+    build_max_composer_runs: int = 40
+    # Wall-clock timeout for a single build, in minutes.
+    build_timeout_min: int = 60
+    # How many times a failing task may be reworked before it is marked blocked.
+    build_max_rework_attempts: int = 3
 
     # ---- Discord ----
     discord_bot_token: str = ""
@@ -77,8 +106,9 @@ class Settings(BaseSettings):
     openclaw_base_url: str = "http://slick-openclaw-bridge:8100"
     openclaw_api_key: str = ""
 
-    # ---- Hermes bridge ----
-    hermes_mode: str = "mock"
+    # ---- Hermes / coding-engine bridge ----
+    # cursor = Composer-backed (default), mock = canned, live = real Hermes deployment.
+    hermes_mode: str = "cursor"
     hermes_base_url: str = "http://slick-hermes-bridge:8200"
     hermes_api_key: str = ""
     hermes_data_dir: str = "/data/hermes"

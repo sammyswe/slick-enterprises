@@ -46,49 +46,69 @@ def _skill_path(proposal: SkillProposal) -> Path:
     return base / "agents" / proposal.scope / f"{slug}.md"
 
 
-def _write_skill(proposal: SkillProposal) -> Path | None:
+def _render_skill(proposal: SkillProposal) -> str:
+    return (
+        f"# {proposal.name}\n\n"
+        f"- Scope: {proposal.scope}\n"
+        f"- Risk: {proposal.risk_level}\n"
+        f"- Proposed by: {proposal.proposed_by}\n\n"
+        f"{proposal.content}\n"
+    )
+
+
+def _write_skill(proposal: SkillProposal) -> bool | None:
+    """Write a skill file. Returns True if newly written/changed, False if unchanged,
+    None on error. Idempotent: only touches disk when the content actually differs."""
     path = _skill_path(proposal)
+    content = _render_skill(proposal)
     try:
+        if path.exists() and path.read_text(encoding="utf-8") == content:
+            return False  # already up to date -> no churn, no event
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            f"# {proposal.name}\n\n"
-            f"- Scope: {proposal.scope}\n"
-            f"- Risk: {proposal.risk_level}\n"
-            f"- Proposed by: {proposal.proposed_by}\n\n"
-            f"{proposal.content}\n",
-            encoding="utf-8",
-        )
-        return path
+        path.write_text(content, encoding="utf-8")
+        return True
     except OSError as exc:  # pragma: no cover - depends on mount
         logger.warning("Could not write skill %s: %s", proposal.name, exc)
         return None
 
 
-async def sync_once() -> int:
+async def sync_once() -> list[str]:
+    """Sync approved skills to disk. Returns the names of skills actually changed."""
     sessionmaker = get_sessionmaker()
-    synced = 0
+    changed: list[str] = []
     async with sessionmaker() as session:
         result = await session.execute(
             select(SkillProposal).where(SkillProposal.status == SkillStatus.approved)
         )
         for proposal in result.scalars().all():
-            path = _write_skill(proposal)
-            if path:
-                synced += 1
-    if synced:
+            if _write_skill(proposal) is True:
+                changed.append(f"{proposal.name} ({proposal.scope})")
+
+    # Only announce when something genuinely changed, with the actual skill names.
+    if changed:
+        preview = "\n".join(f"• {name}" for name in changed[:10])
+        more = f"\n…and {len(changed) - 10} more" if len(changed) > 10 else ""
         await publish_event(
-            {"type": "skills_synced", "channel": "github-prs", "count": synced}
+            {
+                "type": "skills_synced",
+                "channel": "github-prs",
+                "count": len(changed),
+                "message": (
+                    f"📚 Synced {len(changed)} new/updated skill(s) to the repo "
+                    f"`skills/` (ready for the next GitHub commit):\n{preview}{more}"
+                ),
+            }
         )
-    return synced
+    return changed
 
 
 async def main() -> None:
     logger.info("Skill sync worker started.")
     while True:
         try:
-            count = await sync_once()
-            if count:
-                logger.info("Synced %d approved skill(s) to repo.", count)
+            changed = await sync_once()
+            if changed:
+                logger.info("Synced %d new/updated skill(s) to repo.", len(changed))
         except Exception as exc:  # pragma: no cover
             logger.exception("skill-sync error: %s", exc)
         await asyncio.sleep(POLL_SECONDS)

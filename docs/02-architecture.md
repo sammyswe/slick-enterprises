@@ -49,16 +49,23 @@ Owner (Discord) ──idea──► discord-bot ──POST /sheriff/message─�
 
 1. **Intake** — Owner posts an idea in Discord. Bot forwards to `POST /sheriff/message`.
 2. **Clarify** — Sheriff S generates clarifying questions (cheap model) and replies.
-3. **Structure** — Answers become structured requirements + a proposed agent team.
-4. **Approve** — Owner approves in `#approvals` (natural language).
-5. **Provision** — Gateway creates a business compartment (DB rows + files from
-   `businesses/_template`).
-6. **Orchestrate** — Tasks are enqueued; the orchestrator runs the loop per task,
-   delegating coding to Hermes and routing to OpenClaw.
-7. **Execute safely** — Commands run through the sandbox runner (blocklist enforced).
-8. **Account** — Every model call logs a `CostEvent`; cost-controller enforces budget.
-9. **Persist** — Artifacts, skills, and GitHub events are recorded; docs updated.
-10. **Summarize** — Sheriff S posts a milestone update with verification steps.
+3. **Plan (gate 1)** — On the first approval, the **Planner** (Composer, plan mode)
+   produces a structured build plan: vision, stack, a **dynamic agent roster**, and a
+   **milestone + task DAG** with acceptance criteria + verify commands. It is persisted
+   to `Business.meta["build_plan"]`, the roster becomes `agents` rows, the DAG becomes
+   child `tasks` rows, and the full plan is posted to `#approvals`.
+4. **Approve plan (gate 2)** — Owner says "build it"; the umbrella task is enqueued.
+5. **Orchestrate (parallel waves)** — The orchestrator's wave scheduler runs ready
+   tasks in parallel (concurrency-capped) via specialised-agent Composer runs,
+   milestone by milestone.
+6. **Verify + evaluate** — After each milestone, verification commands run in the
+   sandbox-runner and the **Evaluator** judges PASS/FAIL vs acceptance criteria; on
+   FAIL, tasks are re-queued with feedback (bounded by the rework cap).
+7. **Account + bound** — Every model call logs a `CostEvent`; the build is bounded by
+   `BUILD_MAX_COMPOSER_RUNS`, `BUILD_TIMEOUT_MIN`, and the budget hard cap.
+8. **Report** — Live per-agent progress + a final build report stream to
+   `#agent-updates`; the umbrella task is marked done/blocked. See
+   [`04-agent-system.md`](04-agent-system.md) for the engine details.
 
 ## Data model (Postgres, common tables keyed by `business_id`)
 
@@ -66,7 +73,9 @@ See [`packages/shared/slick_shared/models.py`](../packages/shared/slick_shared/m
 
 - `businesses` — compartments (slug, name, status)
 - `agents` — global + business agents (role, scope, status, cost_total)
-- `tasks` — units of work (status, assigned_agent, business_id)
+- `tasks` — units of work (status, assigned_agent, business_id). Build-plan fields:
+  `parent_task_id`, `kind` (umbrella/build/verify), `milestone`, `agent_role`,
+  `depends_on`, `acceptance_criteria`, `plan_local_id`, `rework_count`
 - `cost_events` — per-call spend (model, tokens, estimated_cost, business/agent/task)
 - `skill_proposals` — proposed/approved/deprecated skills (risk_level, scope)
 - `artifacts` — files produced by agents (path, type, business/task)

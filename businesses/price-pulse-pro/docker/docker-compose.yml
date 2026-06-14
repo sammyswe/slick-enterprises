@@ -1,0 +1,190 @@
+name: price-pulse-pro
+
+x-postgres-env: &postgres-env
+  POSTGRES_USER: ${POSTGRES_USER:-pricepulse}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pricepulse}
+  POSTGRES_DB: ${POSTGRES_DB:-pricepulse}
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-pricepulse}:${POSTGRES_PASSWORD:-pricepulse}@postgres:5432/${POSTGRES_DB:-pricepulse}
+  DATABASE_URL_SYNC: postgresql+psycopg://${POSTGRES_USER:-pricepulse}:${POSTGRES_PASSWORD:-pricepulse}@postgres:5432/${POSTGRES_DB:-pricepulse}
+  REDIS_URL: redis://redis:6379/0
+  SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      <<: *postgres-env
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - price_pulse_pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - price_pulse
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - price_pulse_redisdata:/data
+    networks:
+      - price_pulse
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ../.env
+    environment:
+      <<: *backend-env
+      BACKEND_PORT: 8000
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - price_pulse
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import json,urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3); d=json.load(r); assert d.get('status')=='ok'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ../.env
+    environment:
+      <<: *backend-env
+      API_BASE_URL: http://api:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - price_pulse
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import redis; redis.Redis.from_url('redis://redis:6379/0').ping(); cmd=open('/proc/1/cmdline','rb').read().decode(); assert 'app.main' in cmd",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+
+  scheduler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.scheduler
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ../.env
+    environment:
+      <<: *backend-env
+      API_BASE_URL: http://api:8000
+      SCHEDULE_INTERVAL_SECONDS: ${SCHEDULE_INTERVAL_SECONDS:-3600}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - price_pulse
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import redis,time; from app.config import get_settings; s=get_settings(); c=redis.Redis.from_url(s.redis_url,decode_responses=True); c.ping(); hb=c.get(s.heartbeat_key); assert hb is not None and time.time()-int(hb)<7200; cmd=open('/proc/1/cmdline','rb').read().decode(); assert 'app.main' in cmd",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 8
+      start_period: 120s
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ../.env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+      PORT: 3100
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${FRONTEND_PORT:-3100}:3100"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - price_pulse
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:3100',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+
+networks:
+  price_pulse:
+    driver: bridge
+
+volumes:
+  price_pulse_pgdata:
+  price_pulse_redisdata:

@@ -2,6 +2,12 @@
 
 Keep this in sync with provider pricing. Used to estimate `CostEvent.estimated_cost`.
 Unknown models fall back to a conservative default. Mock mode reports $0.
+
+NOTE: This table only applies to the **Anthropic** provider (pay-per-token). The
+Cursor provider (Composer) bills against your Cursor subscription/request pool and
+returns no token counts, so those calls record `estimated_cost = 0` and are tracked
+by run count/usage instead. Authoritative dollar spend lives in the Cursor usage
+dashboard under the "SDK" tag.
 """
 
 from __future__ import annotations

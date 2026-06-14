@@ -10,7 +10,7 @@ The bot ensures these channels exist (configurable via `DISCORD_CHANNELS`):
 |---------|---------|
 | `#slick-control` | High-level control & system commands |
 | `#sheriff-s` | Direct conversation with Sheriff S |
-| `#agent-updates` | Progress updates from agents |
+| `#agent-updates` | Live build progress + task finished summaries |
 | `#approvals` | Approval requests + your natural-language approvals |
 | `#costs` | Budget alerts + cost summaries |
 | `#github-prs` | Branch/commit/PR notifications |
@@ -24,18 +24,36 @@ The bot ensures these channels exist (configurable via `DISCORD_CHANNELS`):
 - **Slash commands can be added later** (e.g. `/status`, `/cost`, `/pause`).
 - Sheriff S is friendly and uses emojis, but stays detailed.
 
-## Typical flow
+## Typical flow (two approval gates)
 
 ```
 You (#business-ideas):  "Idea: scrape AI startup leads and email a daily digest."
 Sheriff S (#sheriff-s): 🤠 A few questions:
                         1. Which sources?  2. How many leads/day?  3. Where to send?
-You:                    answers...
-Sheriff S (#approvals): "Here's the proposed compartment + agent team. Approve?"
-You:                    "approved"
-Sheriff S (#agent-updates): 🤠 Created compartment `example-ai-lead-scraper`...
-                            (milestone update with verify steps)
+You:                    answers... then "approved"
+Sheriff S (#approvals): 🗺️ Build plan: vision, stack, agent crew, milestones+tasks.
+                        Reply "build it" to start.
+You:                    "build it"
+Sheriff S (#agent-updates): live stream — waves, per-agent task start/finish,
+                            sandbox test output, evaluator verdicts, milestone
+                            results, and a final build report.
 ```
+
+## Self-building engine events (→ `#agent-updates`)
+
+The orchestrator publishes rich events so you always know what is queued, building,
+passing/failing, and finished:
+
+| Event type | Channel | Meaning |
+|------------|---------|---------|
+| `build_plan` | `#approvals` | Full plan for the second approval gate |
+| `task_started` | `#agent-updates` | Build kicked off, crew awake |
+| `wave_started` | `#agent-updates` | A milestone / parallel wave is starting |
+| `agent_task` | `#agent-updates` | A specialised agent started/finished a task |
+| `evaluation` | `#agent-updates` | Sandbox test run + Evaluator verdict |
+| `milestone_done` | `#agent-updates` | Milestone passed/failed |
+| `build_report` | `#agent-updates` | Final report (milestones, runs, time, how to run) |
+| `task_finished` | `#agent-updates` | Build complete/stopped + stop reason |
 
 ## Milestone update format
 
