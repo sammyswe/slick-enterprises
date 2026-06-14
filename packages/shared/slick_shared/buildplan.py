@@ -44,6 +44,18 @@ Return ONLY a single JSON object (no markdown fences, no prose) with this shape:
   "handoffs": [
     {"from": "lead-researcher", "to": "content-writer", "artifact": "brief.md"}
   ],
+  "operating_workflows": [
+    {
+      "id": "default-cycle",
+      "description": "One full pass through the operating loop",
+      "trigger_phrases": ["run cycle", "operating cycle", "full cycle"],
+      "steps": [
+        {"agent_role": "lead-researcher", "concern": "gather inputs", "title": "Research inputs", "output_artifact": "artifacts/research.md"},
+        {"agent_role": "operator", "concern": "execute core action", "title": "Execute action", "depends_on_artifact": "artifacts/research.md"},
+        {"agent_role": "qa", "concern": "verify output", "title": "Verify output", "task_type": "verify"}
+      ]
+    }
+  ],
   "milestones": [
     {
       "id": "m1",
@@ -187,6 +199,69 @@ def extract_json_object(text: str) -> dict | None:
     return None
 
 
+def _normalize_operating_workflows(value: Any, agents: list[dict]) -> list[dict]:
+    if not isinstance(value, list):
+        return _default_operating_workflows(agents)
+    out: list[dict] = []
+    roles = {a["role"] for a in agents}
+    for wf in value:
+        if not isinstance(wf, dict):
+            continue
+        wf_id = str(wf.get("id") or f"workflow-{len(out) + 1}").strip()
+        steps: list[dict] = []
+        for raw in wf.get("steps") or []:
+            if not isinstance(raw, dict):
+                continue
+            role = str(raw.get("agent_role") or "").strip().lower().replace(" ", "-")
+            if not role or (roles and role not in roles):
+                continue
+            steps.append(
+                {
+                    "agent_role": role,
+                    "title": str(raw.get("title") or raw.get("concern") or "Operate").strip()[:200],
+                    "description": str(raw.get("description") or raw.get("concern") or "").strip(),
+                    "task_type": str(raw.get("task_type") or "operate"),
+                    "output_artifact": str(raw.get("output_artifact") or ""),
+                    "depends_on_artifact": str(raw.get("depends_on_artifact") or ""),
+                }
+            )
+        if steps:
+            out.append(
+                {
+                    "id": wf_id,
+                    "description": str(wf.get("description") or "").strip()[:400],
+                    "trigger_phrases": _coerce_str_list(wf.get("trigger_phrases")),
+                    "steps": steps,
+                }
+            )
+    return out or _default_operating_workflows(agents)
+
+
+def _default_operating_workflows(agents: list[dict]) -> list[dict]:
+    workers = [a for a in agents if a.get("role") != "business-manager"] or agents[:3]
+    if not workers:
+        return []
+    steps = []
+    for i, agent in enumerate(workers[:3]):
+        steps.append(
+            {
+                "agent_role": agent["role"],
+                "title": f"{agent.get('concern', 'operate')}",
+                "description": agent.get("responsibility", ""),
+                "task_type": "verify" if "qa" in agent["role"] else "operate",
+                "output_artifact": f"artifacts/{agent['role']}-output.md",
+            }
+        )
+    return [
+        {
+            "id": "default-cycle",
+            "description": "One full pass through the operating loop",
+            "trigger_phrases": ["run cycle", "operating cycle", "full cycle"],
+            "steps": steps,
+        }
+    ]
+
+
 def normalize_plan(raw: dict, *, default_name: str, default_slug: str, idea: str) -> dict:
     """Coerce a parsed plan dict into the canonical, fully-populated shape."""
     name = str(raw.get("name") or default_name).strip()[:40] or default_name
@@ -282,6 +357,8 @@ def normalize_plan(raw: dict, *, default_name: str, default_slug: str, idea: str
     if not milestones:
         milestones = _fallback_milestones(agents, slug)
 
+    operating_workflows = _normalize_operating_workflows(raw.get("operating_workflows"), agents)
+
     return {
         "name": name,
         "slug": slug,
@@ -291,6 +368,7 @@ def normalize_plan(raw: dict, *, default_name: str, default_slug: str, idea: str
         "stack": stack or ["Discord", "sandbox-runner", "Hermes"],
         "agents": agents,
         "handoffs": handoffs,
+        "operating_workflows": operating_workflows,
         "milestones": milestones,
     }
 
@@ -411,6 +489,7 @@ def fallback_plan(*, name: str, slug: str, idea: str) -> dict:
         "stack": ["Discord", "sandbox-runner", "Hermes"],
         "agents": agents,
         "handoffs": [],
+        "operating_workflows": _default_operating_workflows(agents),
         "milestones": _fallback_milestones(agents, slug),
     }
 

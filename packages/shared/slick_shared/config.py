@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     # How many times a failing task may be reworked before it is marked blocked.
     build_max_rework_attempts: int = 3
 
+    # ---- Business operations (owner-driven commands in #biz-<slug>) ----
+    ops_max_composer_runs_per_command: int = 5
+
     # ---- Discord ----
     discord_bot_token: str = ""
     discord_guild_id: str = ""

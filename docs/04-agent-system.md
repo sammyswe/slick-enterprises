@@ -71,14 +71,39 @@ for each milestone (in order):
    `#approvals`.
 2. Owner approves the **plan** ("build it") → provisioning + first operational cycle run.
 
+## Business operations (owner-driven commands)
+
+After a business is provisioned, **day-to-day commands** go to the Business Manager in
+`#biz-<slug>`, not to Sheriff S. The flow is **universal for every business**; only the
+agent team plan differs.
+
+```
+Owner (#biz-<slug>) → business_ops_flow → BM elicits requirements
+  → ops_workflow.decompose_command (plan roster + operating_workflows)
+  → orchestrator OperateScheduler (kind=operate)
+  → Hermes/Cursor per specialist step
+  → command_result events → same #biz-<slug> channel
+```
+
+### OperateScheduler
+
+`services/orchestrator/orchestrator/operate.py` runs owner-driven work as **sequential
+steps** (not the build DAG). Each step is one specialist Composer run with artifact
+context from `businesses/<slug>/artifacts/`. Caps: `OPS_MAX_COMPOSER_RUNS_PER_COMMAND`.
+
+MCP servers declared on each agent resolve through `packages/shared/slick_shared/mcp_registry.py`
+(mock stdio adapters by default; real adapters registered per business later).
+
 ## Hierarchy & communication
 
 ```
-Owner ──► Sheriff S ──► Business Manager Agent ──► business sub-agents
+Owner ──► Sheriff S (HQ) ──► provision agent team + #biz-<slug>
+Owner ──► Business Manager (#biz-<slug>) ──► business sub-agents
                    └──► Global agents (shared services)
 ```
 
-- Sheriff S talks to **Business Manager Agents**, not to every sub-agent.
+- **Sheriff S** handles HQ: new ideas, agent team plans, build approval.
+- **Business Manager** handles operations in each `#biz-<slug>` channel.
 - Business agents communicate **through** their Business Manager.
 - Agents should not talk across compartments without routing (via OpenClaw bridge).
 

@@ -36,6 +36,7 @@ from slick_shared.models import (
 from slick_shared.schemas import SheriffReply, SheriffSummary
 
 from .compartment import create_compartment_files, write_agent_profiles
+from .discord_channels import request_business_channel
 
 # Default agent team proposed for a new business compartment.
 DEFAULT_TEAM = [
@@ -411,6 +412,7 @@ async def _generate_plan(session: AsyncSession, task: Task) -> SheriffReply:
     await _staff_roster(session, business, plan)
     create_compartment_files(business.slug, business.name, plan.get("vision", business.description))
     write_agent_profiles(business.slug, plan)
+    await request_business_channel(session, business)
 
     # Turn the idea task into the umbrella task and create the child task DAG.
     task.business_id = business.id

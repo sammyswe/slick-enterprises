@@ -26,6 +26,7 @@ class BusinessOut(ORMModel):
     name: str
     description: str
     status: str
+    meta: dict = Field(default_factory=dict)
     created_at: datetime
 
 
@@ -178,3 +179,23 @@ class SheriffSummary(BaseModel):
     cost_used: str
     how_to_verify: list[str]
     next: list[str]
+
+
+# ---- Business operations (#biz-<slug>) ---------------------------------------
+
+
+class BusinessOpsMessage(BaseModel):
+    channel: str
+    author: str = "owner"
+    content: str
+    discord_channel_id: str | None = None
+    discord_message_id: str | None = None
+
+
+class BusinessOpsReply(BaseModel):
+    reply: str
+    task_id: str | None = None
+    run_id: str | None = None
+    steps_planned: int = 0
+    needs_input: bool = False
+    clarifying_questions: list[str] = Field(default_factory=list)

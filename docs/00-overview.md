@@ -15,9 +15,10 @@ compartment, and runs operational cycles — with cost tracking and safety rails
 ## Who's who
 
 - **You (the Owner)** — describe ideas, approve high-risk actions, set budget.
-- **Sheriff S** — top-level coordinator and your single Discord contact. Designs agent
-  teams, coordinates provisioning and operations, reports in plain language.
-- **Business Manager Agents** — one per business; Sheriff S routes through these.
+- **Sheriff S** — HQ coordinator in `#business-ideas`, `#sheriff-s`, `#approvals`.
+  Designs agent teams, coordinates provisioning, reports in plain language.
+- **Business Manager Agents** — one per business; you talk to them in **`#biz-<slug>`**
+  to run day-to-day operations (elicitation → delegation → results in-channel).
 - **Global agents** — reusable across businesses (cost controller, skill curator,
   evaluator, architects, devops, github, …).
 - **Business agents** — instantiated per business from the **agent team plan** (dynamic

@@ -11,6 +11,7 @@ from typing import Any
 
 from .buildplan import agent_by_role
 from .config import get_settings
+from .mcp_registry import resolve_mcp_servers_for_agent
 from .prompts import constitution_summary, engine_system_preamble
 
 
@@ -219,22 +220,46 @@ Hands off to: {", ".join(agent_spec.get('hands_off_to') or []) or "TBD"}
 
 
 def mcp_servers_for_sdk(agent_spec: dict) -> list[dict[str, Any]]:
-    """Shape MCP server configs for the Cursor SDK."""
-    servers: list[dict[str, Any]] = []
-    for m in resolve_mcp_servers(agent_spec):
-        name = m.get("name")
-        if not name:
-            continue
-        entry: dict[str, Any] = {"name": name}
-        if m.get("url"):
-            entry["url"] = m["url"]
-            if m.get("headers"):
-                entry["headers"] = m["headers"]
-        elif m.get("command"):
-            entry["command"] = m["command"]
-            if m.get("args"):
-                entry["args"] = m["args"]
-            if m.get("env"):
-                entry["env"] = m["env"]
-        servers.append(entry)
-    return servers
+    """Resolve MCP server configs for the Cursor SDK via the adapter registry."""
+    return resolve_mcp_servers_for_agent(list(agent_spec.get("mcp_servers") or []))
+
+
+def build_manager_ops_prompt(*, plan: dict, business_slug: str, ops_state: dict) -> str:
+    """System prompt for Business Manager operational conversations."""
+    bm = agent_by_role(plan, "business-manager") or {
+        "role": "business-manager",
+        "name": "Business Manager",
+        "concern": "orchestration",
+        "responsibility": "Route owner commands to the agent team.",
+    }
+    agents = plan.get("agents") or []
+    roster = "\n".join(
+        f"- **{a.get('name', a['role'])}** (`{a['role']}`): {a.get('concern', a.get('responsibility', ''))}"
+        for a in agents
+    )
+    handoffs = plan.get("handoffs") or []
+    handoff_lines = "\n".join(
+        f"- `{h.get('from')}` → `{h.get('to')}`: {h.get('artifact', 'handoff')}" for h in handoffs
+    ) or "- (see agent profiles)"
+    mode = ops_state.get("mode", "idle")
+    active = ops_state.get("active_command", "")
+
+    return (
+        "You are the **Business Manager** for this business compartment. "
+        "The owner runs the business through this Discord channel — not Sheriff S.\n\n"
+        f"# Business\n**{plan.get('name')}** (`{business_slug}`)\n"
+        f"**Model:** {plan.get('business_model', plan.get('vision', ''))}\n"
+        f"**Operating loop:** {' → '.join(plan.get('operating_loop') or [])}\n\n"
+        f"# Your team\n{roster}\n\n"
+        f"# Handoffs\n{handoff_lines}\n\n"
+        "# Universal ops contract\n"
+        "1. Elicit requirements before executing ambiguous commands (3–5 numbered questions).\n"
+        "2. Decompose the owner's goal into steps assigned to the right specialists.\n"
+        "3. Never do specialist work yourself — delegate by role.\n"
+        "4. Summarize results clearly; ask the owner when a decision is needed.\n"
+        "5. External publish/post/spend requires explicit owner approval.\n"
+        "6. New business ideas belong in #business-ideas — redirect politely.\n\n"
+        f"# Current state\nmode={mode}; active_command={active or '(none)'}\n\n"
+        f"# Your mission\n{bm.get('responsibility', '')}\n\n"
+        f"# Constitution (do not violate)\n{constitution_summary(1200)}"
+    )

@@ -17,7 +17,7 @@ from slick_shared.db import get_engine
 from slick_shared.logging import setup_logging
 from slick_shared.queue import ping as redis_ping
 
-from .routers import agents, businesses, costs, sheriff, skills, tasks
+from .routers import agents, business_ops, businesses, costs, sheriff, skills, tasks
 
 logger = setup_logging("gateway")
 settings = get_settings()
@@ -46,6 +46,7 @@ app.add_middleware(
 )
 
 app.include_router(businesses.router)
+app.include_router(business_ops.router)
 app.include_router(agents.router)
 app.include_router(tasks.router)
 app.include_router(costs.router)
